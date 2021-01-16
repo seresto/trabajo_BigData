@@ -1,0 +1,439 @@
+---
+title: "Análisis de la economía griega"
+subtitle: "Sergio Escorcia Torres(seresto@alumni.uv.es)" #- pongo tú nombre ahí para q aparezca más grande q el de la UV
+author: "Universitat de València"
+date: "Diciembre de 2020 (actualizado el `r format(Sys.time(), '%d-%m-%Y')`)"
+output:
+  html_document:
+    #css: "./assets/my_css_file.css"
+    theme: paper
+    highlight: textmate 
+    toc: true
+    toc_depth: 3 
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    self_contained: true
+    number_sections: false
+    df_print: kable
+    code_download: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r packages-setup, include = FALSE}
+library(tidyverse)
+library(klippy)  #- remotes::install_github("rlesur/klippy")
+library(knitr)
+
+```
+
+```{r chunk-setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, 
+                      #results = "hold",
+                      cache = FALSE, cache.path = "/caches/", comment = "#>",
+                      #fig.width = 7, #fig.height= 7,   
+                      #out.width = 7, out.height = 7,
+                      collapse = TRUE,  fig.show = "hold",
+                      fig.asp = 7/9, out.width = "60%", fig.align = "center")
+knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
+```
+
+```{r options-setup, include = FALSE}
+options(scipen = 999) #- para quitar la notación científica
+options("yaml.eval.expr" = TRUE) 
+```
+
+
+```{r klippy, echo = FALSE}
+klippy::klippy(position = c("top", "right")) #- remotes::install_github("rlesur/klippy")
+```
+
+<hr class="linea-black">
+
+Trabajo elaborado para la asignatura "Programación y manejo de datos en la era del Big Data" de la Universitat de València durante el curso 2020-2021. El repo del trabajo está [aquí](https://github.com/seresto/trabajo_BigData){target="_blank"}. La página web de la asignatura y los trabajos de mis compañeros pueden verse [aquí](https://perezp44.github.io/intro-ds-20-21-web/07-trabajos.html){target="_blank"}.
+
+<!-- El párrafo de arriba has de dejarlo casi igual, 
+        solo HAS de SUSTITUIR las 2 veces que aparece "perezp44" por tu usuario de Github-->
+        
+![](./datos/fotos/1024px-Flag_of_Greece.svg.png) 
+
+# 1. INTRODUCCIÓN
+
+El objetivo del trabajo es entender la economía griega, estudiando su evolución así como sus variables macroeconómicas más importantes entendiendo las causas que han provocado esta evolución. Analizar las políticas fiscales (la evolución y situación actual de la misma tras la crisis financiera), la evolución de uno de sus sectores más importantes como es el turismo (y mostrar algunos de los lugares mas bonitos) y el impacto que ha tenido el COVID en este, etc.
+
+```{r, eval = TRUE, echo = FALSE}
+library(ggplot2)
+library(tidyverse)
+library(ggthemes)
+library(rnaturalearth)
+library(kableExtra)
+library(leaflet)
+library(vembedr)
+library(plotly)
+library(gganimate)
+```
+
+## Posición geográfica de Grecia {.tabset}
+
+Grecia se sitúa en la parte sureste de Europa, su capital es Atenas y es un país conocido por la cantidad de turistas que atrae cada año. Gran parte del territorio griego está formado por islas y un país muy montañoso (es el país de Europa con mas picos montañosos) donde predomina el clima mediterráneo. 
+
+Mostramos en un mapa las principales ciudades griegas:
+
+### Mapa
+
+```{r, echo = FALSE, eval = TRUE}
+posicion_grecia <- leaflet() %>% addTiles() %>% setView(lng = 21.824312, lat = 39.074208, zoom = 6) %>% addMarkers(lng = c(23.7308, 22.93086, 25.14341, 21.73444), lat = c(37.9816, 40.64361, 35.32787, 38.24444), popup = c("Atenas", "Salónica", "Heraklion", "Patrasse")) %>% addPopups(lng = 23.7308, lat = 37.9816, popup = "Atenas") 
+
+#- creamos el gráfico que muestre las ciudades más importantes, pero que la capital aparezca marcada desde el inicio
+
+posicion_grecia
+```
+
+### Código 
+
+```{r, echo = TRUE, eval = FALSE}
+posicion_grecia <- leaflet() %>% addTiles() %>% setView(lng = 21.824312, lat = 39.074208, zoom = 6) %>% addMarkers(lng = c(23.7308, 22.93086, 25.14341, 21.73444), lat = c(37.9816, 40.64361, 35.32787, 38.24444), popup = c("Atenas", "Salónica", "Heraklion", "Patrasse")) %>% addPopups(lng = 23.7308, lat = 37.9816, popup = "Atenas") 
+
+#- creamos el gráfico que muestre las ciudades más importantes, pero que la capital aparezca marcada desde el inicio
+
+posicion_grecia
+```
+
+
+# 2. SECTOR EXTERIOR DE GRECIA.
+
+## Balanza de pagos {.tabset}
+
+```{r, eval = TRUE, echo = FALSE}
+datos_grecia <- rio::import("./datos/BANCO MUNDIAL/DATOS_GRECIA.xls") %>% select(-c("Country Code", "Indicator Code", "Country Name")) %>% rename(Indicador = "Indicator Name") 
+
+datos_zona_euro <- rio::import("./datos/BANCO MUNDIAL/ZONA EURO.xls") %>% select(-c("Country Code", "Indicator Code", "Country Name")) %>% rename(Indicador = "Indicator Name")
+
+#- importamos los datos de Grecia del Banco Mundial, nos quedamos con las variables que nos interesan y renombramos el resto
+
+datos_balanzas_pago_cc <- rio::import("./datos/BALANZA DE PAGOS/CUENTA_CORRIENTE.xlsx") %>% select(-c("CAMBIAR, %"))
+datos_balanzas_pago_cf <- rio::import("./datos/BALANZA DE PAGOS/CUENTA FINANCIERA.xlsx") %>% select(-c("CAMBIAR, %")) 
+datos_balanzas_pago_ck <- rio::import("./datos/BALANZA DE PAGOS/CUENTA DE CAPITAL.xlsx") %>% select(-c("CAMBIAR, %"))
+datos_balanzas_pago_ce <- rio::import("./datos/BALANZA DE PAGOS/CUENTA ERRORES.xlsx") %>% select(-c("CAMBIAR, %"))
+
+datos_balanza_pago1 <- merge(datos_balanzas_pago_cc, datos_balanzas_pago_cf, by = "FECHA") %>% rename(Cuenta_corriente = "VALOR.x", Cuenta_financiera = "VALOR.y")
+datos_balanza_pago2 <- merge(datos_balanza_pago1, datos_balanzas_pago_ck, by = "FECHA") %>% rename(Cuenta_capital = "VALOR")  
+datos_balanza_pago <- merge(datos_balanza_pago2, datos_balanzas_pago_ce, by = "FECHA")  %>% rename(Cuenta_errores = "VALOR", Año = "FECHA") %>% mutate(Cuenta_financiera = - Cuenta_financiera, Balanza_pagos = Cuenta_corriente + Cuenta_financiera + Cuenta_capital + Cuenta_errores) 
+
+#- importamos las distintas balanzas de Grecia, las unimos en un solo DF y creamos la variable balanza de pagos
+
+```
+
+En primer lugar vamos a estudiar la evolución de la balanza de pagos de Grecia (representada en negro). Observamos que en el periodo anterior a la crisis la balanza por cuenta corriente (que mide la diferencia entre exportaciones e importaciones de bienes y servicios) era muy deficitaria, pero debido al fuerte impacto que tuvo la crisis financiera empezada en Grecia, las importaciones de bienes y servicios cayeron en mayor medida de lo que hicieron las exportaciones (es decir, la mejora de la balanza por cuenta corriente fué debida al menor poder adquisitivo de los ciudadanos griegos mas que a una mejora de las exportaciones). 
+
+El saldo deficitario de la balanza por cuenta corriente obliga a un superavit en la cuenta de activos, por ello la cuenta financiera (la que mide la diferencia entre exportaciones e importaciones de activos) griega es positiva y sigue la evolución inversa a la balanza por cuenta corriente. La cuenta de capitales tiene un peso bastante menor en la balanza de pagos y siempre ha mostrado un superávit. La cuenta de errores y omisiones mide las transacciones que no han sido incluidas en el resto de las balanzas y se incluye porque la suma de las 3 balanzas que conforman la balanza de pagos (cuenta corriente, financiera y de capitales) han de sumar 0.
+
+### Gráfico
+
+```{r, echo = FALSE, eval = TRUE}
+grafico_balanza_pagos <- datos_balanza_pago %>% ggplot(aes(x = Año, group = 1)) +           geom_line(aes(x = Año, y = Cuenta_corriente), colour = "green1") +
+  geom_line(aes(x = Año, y = Cuenta_financiera), colour = "orange") + 
+  geom_line(aes(x = Año, y = Cuenta_capital), colour = "blue") +
+  geom_line(aes(x = Año, y = Cuenta_errores), colour = "red") + 
+  geom_line(aes(x = Año, y = Balanza_pagos), colour = "black") +
+  theme_solarized() +
+  scale_x_continuous(breaks = seq(2008, 2019, 2)) +
+  labs(
+    title = "Balanza de pagos de Grecia",
+    subtitle = "Periodo 2008-2019, US$ actuales",
+    caption = "Datos provenientes de KNOEMA",
+    y = "Nivel de las balanzas"
+  )
+grafico_balanza_pagos
+```
+
+Observamos que con la moderación del déficit por cuenta corriente el superávit por cuenta financiera también se modera, mostrando ambas balanzas un saldo mas equilibrado aunque sin llegar a ser positiva. Entre los sectores exportadores más importantes de Grecia está el turismo, el cual estudiaremos como ha evolucionado en su periodo más reciente mas adelante, además de la metalúrgia, los productos químicos, el tabaco y productos textiles.
+
+### Código del gráfico
+
+```{r, echo = TRUE, eval = FALSE, messsage = FALSE}
+grafico_balanza_pagos <- datos_balanza_pago %>% ggplot(aes(x = Año, group = 1)) +           geom_line(aes(x = Año, y = Cuenta_corriente), colour = "green1") +
+  geom_line(aes(x = Año, y = Cuenta_financiera), colour = "orange") + 
+  geom_line(aes(x = Año, y = Cuenta_capital), colour = "blue") +
+  geom_line(aes(x = Año, y = Cuenta_errores), colour = "red") + 
+  geom_line(aes(x = Año, y = Balanza_pagos), colour = "black") +
+  theme_solarized() +
+  scale_x_continuous(breaks = seq(2008, 2019, 2))
+  labs(
+    title = "Balanza de pagos de Grecia",
+    subtitle = "Periodo 2008-2019, US$ actuales",
+    caption = "Datos provenientes de KNOEMA",
+    y = "Nivel de las balanzas"
+  )
+grafico_balanza_pagos
+```
+
+### Preparación de datos
+
+```{r, eval = FALSE, echo = TRUE}
+#- En este caso como la preparación de datos ocupa mucho como para ponerlo junto al código del gráfico, lo pongo por separado
+
+datos_grecia <- rio::import("./datos/BANCO MUNDIAL/DATOS_GRECIA.xls") %>% select(-c("Country Code", "Indicator Code", "Country Name")) %>% rename(Indicador = "Indicator Name") 
+
+datos_zona_euro <- rio::import("./datos/BANCO MUNDIAL/ZONA EURO.xls") %>% select(-c("Country Code", "Indicator Code", "Country Name")) %>% rename(Indicador = "Indicator Name")
+
+#- importamos los datos de Grecia del Banco Mundial, nos quedamos con las variables que nos interesan y renombramos el resto
+
+datos_balanzas_pago_cc <- rio::import("./datos/BALANZA DE PAGOS/CUENTA_CORRIENTE.xlsx") %>% select(-c("CAMBIAR, %"))
+datos_balanzas_pago_cf <- rio::import("./datos/BALANZA DE PAGOS/CUENTA FINANCIERA.xlsx") %>% select(-c("CAMBIAR, %")) 
+datos_balanzas_pago_ck <- rio::import("./datos/BALANZA DE PAGOS/CUENTA DE CAPITAL.xlsx") %>% select(-c("CAMBIAR, %"))
+datos_balanzas_pago_ce <- rio::import("./datos/BALANZA DE PAGOS/CUENTA ERRORES.xlsx") %>% select(-c("CAMBIAR, %"))
+
+datos_balanza_pago1 <- merge(datos_balanzas_pago_cc, datos_balanzas_pago_cf, by = "FECHA") %>% rename(Cuenta_corriente = "VALOR.x", Cuenta_financiera = "VALOR.y")
+datos_balanza_pago2 <- merge(datos_balanza_pago1, datos_balanzas_pago_ck, by = "FECHA") %>% rename(Cuenta_capital = "VALOR")  
+datos_balanza_pago <- merge(datos_balanza_pago2, datos_balanzas_pago_ce, by = "FECHA")  %>% rename(Cuenta_errores = "VALOR", Año = "FECHA") %>% mutate(Cuenta_financiera = - Cuenta_financiera, Balanza_pagos = Cuenta_corriente + Cuenta_financiera + Cuenta_capital + Cuenta_errores) 
+
+#- importamos las distintas balanzas de Grecia, las unimos en un solo DF y creamos la variable balanza de pagos
+
+```
+
+## Destino exportaciones {.tabset}
+
+Ahora vemos los principales destinos de las exportaciones griegas durante los años finales de la crisis:
+
+### TABLA
+```{r, echo = FALSE}
+destino_exportaciones <- rio::import("./datos/destino exportaciones.xlsx") #- importamos los datos
+
+tabla_destino_exportaciones <- destino_exportaciones
+  
+knitr::kable(tabla_destino_exportaciones,
+  format.args = list(decimal.mark = ",", big.mark = "."),
+  align = "c",
+  caption = "Países receptores de las exportaciones griegas"
+) %>% kable_styling(fixed_thead = list(enabled = T, background = "red")) %>% row_spec(12, background = "blue", color = "white") %>% row_spec(11, color = "orange") #- creamos la tabla, resaltando algunas filtas (como el total o al resto del mundo)
+
+```
+
+Observamos como Turquía se convierte en principal receptor de las exportaciones griegas, seguido por Italia y Alemania. Si representamos en un mapa los países que mas exportaciones compran a Grecia:
+
+### CÓDIGO
+
+```{r, echo = TRUE, eval = FALSE}
+tabla_destino_exportaciones <- destino_exportaciones
+  
+knitr::kable(tabla_destino_exportaciones,
+  format.args = list(decimal.mark = ",", big.mark = "."),
+  align = "c",
+  caption = "Países receptores de las exportaciones griegas"
+) %>% kable_styling(fixed_thead = list(enabled = T, background = "red")) %>% row_spec(12, background = "blue", color = "white") %>% row_spec(11, color = "orange")
+
+```
+
+## Otra forma de visualizar estos datos {.tabset}
+
+Mostramos en un mapa, en donde el mayor tamaño del punto en cada país representa un número mayor de exportaciones que van destinadas a estos países.
+
+### MAPA
+
+```{r, echo = FALSE}
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+#- creamos el df con los datos geográficos de los países que aparecen en la tabla
+
+paises <- data.frame(
+  pais = c("Turquía", "Italia", "Alemania", "Bulgaria", "Chipre", "Reino Unido", "Estados Unidos", "Francia", "Rumania", "Macedonia", "Grecia"),
+  longitude = c(35.24, 12.57, 10.45, 25.49, 33.43, -3.44, -95.71, 2.21, 24.97, 21.74, 21.82),
+  latitude = c(38.96, 41.87, 51.17, 42.73, 35.13, 55.38, 37.09, 46.23, 45.94, 41.61, 39.07),
+  exportaciones_2014 = c(4334775889, 3155823150, 2315844180, 1767240794, 1614683238, 1270646299, 1019274291, 860808788, 834755595, 934353887, 0)
+)
+
+#- hacemos el mapa
+
+mapa <- world %>% ggplot() + geom_sf(fill = "antiquewhite") + 
+  coord_sf(xlim = c(-15, 45), ylim = c(30, 60), expand = FALSE) +
+  geom_point(data = paises, aes(x = longitude, y = latitude, size = exportaciones_2014)) +
+  geom_text(data = paises, aes(x = longitude +6, y = latitude, label = pais)) +
+  theme_solarized() +
+  labs(
+    title = "Distribución de las exportaciones griegas (2014)",
+    caption = "Datos provenientes de KNOEMA",
+    x = "Longitud",
+    y = "Latitud",
+    size = "Exportaciones"
+  )
+mapa
+```
+
+Vemos como la mayoría de los países que más importan productos y servicios griegos están próximos a Grecia, seguramente por los bajos costes de transporte a estos países. Este es el caso de Rumania, Bulgaria, Macedonia, Turquía, Chipre e Italia. El comercio tan alto con Italia, Turquía y Chipre es debido a la potente industria naviera griega la cual abarata el transporte de productos a estos países.
+
+Es en parte esta gran ventaja competitiva que tiene Grecia en su industria naval que le permite ser muy competitiva en varios productos que se pueden transportar de esta forma, las exportaciones textiles se benefícian en gran parte de ello.
+
+### CÓDIGO
+
+```{r, echo = TRUE, eval = FALSE}
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+#- creamos el df con los datos geográficos de los países que aparecen en la tabla
+
+paises <- data.frame(
+  pais = c("Turquía", "Italia", "Alemania", "Bulgaria", "Chipre", "Reino Unido", "Estados Unidos", "Francia", "Rumania", "Macedonia", "Grecia"),
+  longitude = c(35.24, 12.57, 10.45, 25.49, 33.43, -3.44, -95.71, 2.21, 24.97, 21.74, 21.82),
+  latitude = c(38.96, 41.87, 51.17, 42.73, 35.13, 55.38, 37.09, 46.23, 45.94, 41.61, 39.07),
+  exportaciones_2014 = c(4334775889, 3155823150, 2315844180, 1767240794, 1614683238, 1270646299, 1019274291, 860808788, 834755595, 934353887, 0)
+)
+
+#- hacemos el mapa
+
+mapa <- world %>% ggplot() + geom_sf(fill = "antiquewhite") + 
+  coord_sf(xlim = c(-15, 45), ylim = c(30, 60), expand = FALSE) +
+  geom_point(data = paises, aes(x = longitude, y = latitude, size = exportaciones_2014)) +
+  geom_text(data = paises, aes(x = longitude +6, y = latitude, label = pais)) +
+  theme_solarized() +
+  labs(
+    title = "Distribución de las exportaciones griegas (2014)",
+    caption = "Datos provenientes de KNOEMA",
+    x = "Longitud",
+    y = "Latitud",
+    size = "Exportaciones"
+  )
+mapa
+```
+
+# 3. SECTOR TURÍSTICO GRIEGO
+
+En este apartado analizamos como ha afectado el coronavirus a uno de sus sectores mas importantes como es el turismo y la reacción del gobierno griego para hacer frente a la crisis del coronavirus. 
+
+El turismo se ha visto afectado negativamente para todos los países por las restricciones internacionales sobre la movilidad adoptadas por los países para hacer frente a la pandemia. Las economías que tienen altos niveles de turismo se han visto afectadas, ya que el turismo también influye en otros sectores de la economía, como la restauración y la hostelería.
+
+Sin embargo, como veremos a continuación, el sector turístico en Grecia es más importante de lo que lo es para el resto de países de la zona euro y es un sector estratégico para la economía griega, al ser una de las princiales fuentes de ingresos de la misma.
+
+## Peso del turismo en la economía griega {.tabset}
+
+### Peso sobre las exportaciones
+
+El turismo siempre ha representado una gran proporción de la balanza comercial griega, en el gráfico a continuación comparamos el peso porcentual que tiene el turismo internacional sobre las exportaciones con la media de los países de las zona euro, donde las barras rojas representan los datos de la eurozona (media de los países de la zona euro) y las azules los de Grecia.
+
+```{r, echo = FALSE}
+turismo_grecia <- rio::import("./datos/BANCO MUNDIAL/DATOS_GRECIA.xls") %>% rename(Indicador = "Indicator Name") %>% filter(Indicador == "Turismo internacional, recibos (% del total de exportaciones)") %>% select(-c("Indicator Code", Indicador, "Country Code", "Country Name")) %>% pivot_longer(cols = everything(), names_to = "Año", values_to = "Turismo_Grecia")
+
+turismo_eurozona <- rio::import("./datos/BANCO MUNDIAL/ZONA EURO.xls") %>% rename(Indicador = "Indicator Name") %>% filter(Indicador == "Turismo internacional, recibos (% del total de exportaciones)") %>% select(-c("Indicator Code", Indicador, "Country Code", "Country Name")) %>% pivot_longer(cols = everything(), names_to = "Año", values_to = "Turismo_Eurozona")
+
+turismo <- merge(turismo_grecia, turismo_eurozona, by ="Año") %>% drop_na()
+
+grafico_turismo <- turismo %>% ggplot() + geom_bar(aes(x = Año, y = Turismo_Grecia), colour = "blue", stat = "identity", fill = "blue") + geom_bar(aes(x = Año, y = Turismo_Eurozona), stat = "identity", colour = "black", fill = "red") + theme_solarized() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + labs(title = "Turismo sobre el total de las exportaciones, \ncomparación con Europa", x = "Año", y = "Porcentaje de turismo sobre las exportaciones", caption = "Datos provenientes del Banco Mundial") 
+grafico_turismo 
+```
+
+Observamos que claramente el sector turístico griego tiene un peso mayor sobre la economía nacional (sobre un 30% de las exportaciones griegas y sobre un 8% del PIB) que la que tiene para la media de los países de la eurozona (sobre un 7,5% de sus exportaciones). 
+
+Esto ha contribuido a que la crisis del coronavirus haya tenido un mayor impacto en la economía griega que en el resto de países. El PIB de Grecia ha caído un 8% debido a esto, según reportan informes, por ponerlo en contexto, para España que es un país donde el turismo representa una gran fuente de ingresos ha sido de un 3'3%. Para frenar la caída del PIB el gobierno griego aprobó la supresión del IVA hasta marzo de 2021.
+
+Se calcula (no existen todavía cifras oficiales) que el turismo va a caer en Grecia un 75% durante este año: un 80% para el turimsmo internacional y un 45% el turismo de interior.
+
+### Código
+
+```{r, echo = TRUE, eval = FALSE}
+turismo_grecia <- rio::import("./BANCO MUNDIAL/API_GRC_DS2_es_excel_v2_1873453.xls") %>% rename(Indicador = "Indicator Name") %>% filter(Indicador == "Turismo internacional, recibos (% del total de exportaciones)") %>% select(-c("Indicator Code", Indicador, "Country Code", "Country Name")) %>% pivot_longer(cols = everything(), names_to = "Año", values_to = "Turismo_Grecia")
+
+turismo_eurozona <- rio::import("./BANCO MUNDIAL/API_EMU_DS2_es_excel_v2_1882537.xls") %>% rename(Indicador = "Indicator Name") %>% filter(Indicador == "Turismo internacional, recibos (% del total de exportaciones)") %>% select(-c("Indicator Code", Indicador, "Country Code", "Country Name")) %>% pivot_longer(cols = everything(), names_to = "Año", values_to = "Turismo_Eurozona")
+
+#- importamos los datos de los 2 excels
+
+turismo <- merge(turismo_grecia, turismo_eurozona, by ="Año") %>% drop_na()
+
+#- unimos ambos excels en uno solo
+
+grafico_turismo <- turismo %>% ggplot() + geom_bar(aes(x = Año, y = Turismo_Grecia), colour = "blue", stat = "identity", fill = "blue") + geom_bar(aes(x = Año, y = Turismo_Eurozona), stat = "identity", colour = "black", fill = "red") + theme_solarized() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + labs(title = "Turismo sobre el total de las exportaciones, \ncomparación con Europa", x = "Año", y = "Porcentaje de turismo sobre las exportaciones", caption = "Datos provenientes del Banco Mundial") 
+grafico_turismo 
+
+#- representamos el gráfico
+```
+
+## Sitios más visitados {.tabset}
+
+### Acrópolis de Atenas
+
+Es el monumento griego más emblemático, ha sufrido incendios, guerras y derrumbes pero sigue conservando su encanto para los turistas. 
+
+![](./datos/fotos/acropolis-atardecer-partenon-ogd5x9cg2cxif833st60e5yvorukf17a8mq145zcz4.jpg) 
+
+### Partenón
+
+Templo de mármol blanco y en proceso de restauración desde 1841, es el segundo lugar más visitado de Grecia tras la Acrópolis.
+
+![](./datos/fotos/The_Parthenon_in_Athens.jpg) 
+
+### Meteora
+
+Su nombre en español significa "Monasterios caídos del cielo", están clasificados como Patrimonio de la Humanidad desde 1988 por la UNESCO.
+
+![](./datos/fotos/monasterio-acebo-varlaam-meteora-grecia_97070-688.jpg) 
+
+### Vídeo sobre Grecia
+
+Incluyo también un video de algunos de los sitios más bonitos de Grecia que me ha parecido interesante.
+
+```{r, echo = FALSE}
+
+embed_url("https://www.youtube.com/watch?v=2X61DHwtVe4") %>%
+  use_align("center")
+
+```
+
+
+## Respuesta a la caída del PIB por el COVID
+
+La crisis del coronavirus llega a Grecia en un momento crítico, con la política fiscal limitada en gran parte debido al alto nivel de deuda y con la política monetaria en manos del BCE. Como hemos comentado, la caída del turismo debido a las restricciones de movimiento ha tenido un fuerte impacto en Grecia debido a la gran depedencia de este sector por parte de la economía.
+
+En este apartado estudiamos los mecansimos de respuesta que ha adoptado Grecia para hacer frente a los problemas económicos.
+
+### Política fiscal {.tabset}
+
+La política fiscal griega se encuentra limitada debido al alto nivel de deuda que acumula Grecia desde el periodo anterior a la crisis financiera de 2007. Como observamos en el siguiente gráfico animado, el nivel de deuda de Grecia se encuentra muy por encima de la media de la zona euro:
+
+#### Gráfico deuda griega
+
+```{r, echo = FALSE, eval = TRUE}
+deuda_grecia <- rio::import("./datos/datosmacro/DEUDA GRECIA.xlsx") %>% rename(Año = Fecha, Deuda_Sobre_PIB = "Deuda (%PIB)") %>% select(Año, Deuda_Sobre_PIB)
+
+grafico_deuda_grecia <- deuda_grecia %>% ggplot(aes(x = Año, y = Deuda_Sobre_PIB/100, group = 1)) + geom_point() + geom_line() + theme_solarized() + labs(title = "Deuda externa griega sobre el PIB", x = "Año", y = "Porcentaje de deuda sobre el PIB", caption = "Datos provenientes de datosmacro") + scale_y_continuous(labels = scales::percent) + transition_reveal(Año)
+
+animate(grafico_deuda_grecia, nframes = 60, duration = 3)
+```
+
+El nivel de deuda griega comienza a elevarse a partir de 1980, observamos como los ya altos niveles de deuda (ya se encontraban en torno al 100% del PIB antes de la crisis financiera de 2007) se elevan todavía más durante la crisis financiera. Este hecho puso en jaque la economía griega, así como su estancia en el euro y tuvo que ser rescatada.
+
+El elevado nivel de deuda que arrastra hasta día de hoy limita mucho el gasto público que puede aplicar el gobierno, ya que se enfrenta a restricciones por parte de la eurozona.
+
+El gobierno griego venía aplicando una bajada de impuestos desde desde la reforma fiscal de 2019 y que se ha visto acelerada con la crisis del coronavirus, ya que el gobierno griego ha eliminado el IVA como impuesto hasta marzo de 2021 como medida para fomentar el consumo y impulsar la economía.
+
+#### Código 
+```{r, echo = TRUE, eval = FALSE}
+deuda_grecia <- rio::import("./datos/datosmacro/DEUDA GRECIA.xlsx") %>% rename(Año = Fecha, Deuda_Sobre_PIB = "Deuda (%PIB)") %>% select(Año, Deuda_Sobre_PIB)
+
+grafico_deuda_grecia <- deuda_grecia %>% ggplot(aes(x = Año, y = Deuda_Sobre_PIB/100, group = 1)) + geom_line() + theme_solarized() + labs(title = "Deuda externa griega sobre el PIB", x = "Año", y = "Porcentaje de deuda sobre el PIB", caption = "Datos provenientes de datosmacro") + scale_y_continuous(labels = scales::percent) + transition_reveal(Año)
+
+animate(grafico_deuda_grecia, nframes = 60, duration = 3)
+```
+
+# 4. CONCLUSIÓN
+
+Pese a que la economía griega no pasa una buena racha desde el periodo anterior a la crisis financiera de 2007 y con la presente crisis por el coronavirus, que hemos comentado durante el trabajo, Grecia sigue siendo uno de los países preferidos por los turistas por sus maravillosos lugares y no cabe duda que el turismo recuperará sus niveles anteriores a la pandemia.
+
+Durante el trabajo hemos comentado los desequilibrios macroeconómicos por cuenta corriente y deuda pública de Grecia, aunque también hemos comentado cosas positivas derivadas del turismo y la evolución de este por la pandemia.
+
+
+# 5. BIBLIOGRAFÍA
+
+Me he basado en algunos artículos y webs como:
+
+[El Confidencial. (2020). La crisis del turismo por el covid le cuesta más a España que a Francia e Italia juntas](https://www.elconfidencial.com/economia/2021-01-13/crisis-turismo-covid-cuesta-espana-mas-italia-francia-juntas_2896411/)
+
+[The Economic Times. (2020). Greek economy may contract 11% percent in 2020, central bank says](https://economictimes.indiatimes.com/news/international/business/greek-economy-may-contract-11-percent-in-2020-central-bank-says/articleshow/79722875.cms)
+
+[20minutos. (2020). España sube los impuestos en plena pandemia... mientras el resto de los países de Europa los baja](https://www.20minutos.es/noticia/4434149/0/espana-sube-los-impuestos-en-plena-pandemia-mientras-europa-los-baja-y-grecia-elimina-el-iva/)
+
+[Expansion, datosmacro](https://datosmacro.expansion.com/paises/grecia)
+
+[Banco Mundial. (2020). Grecia | Data - Datos de libre acceso del Banco Mundial](https://datos.bancomundial.org/pais/grecia)
+
+[KNOEMA](https://knoema.es/atlas/Grecia/topics/Econom%C3%ADa)
+
+[GTP Headlines Greece. (2020). Pandemic Costs Greece €15bn in Tourism Revenues](https://news.gtp.gr/2020/12/16/pandemic-costs-greece-e15bn-in-tourism-revenues/)
